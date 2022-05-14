@@ -5,10 +5,14 @@
 #include <cmath>
 #include <set>
 #include <stack>
+#include <queue>
 
 // Este es el método principal que se piden en la practica.
 // Tiene como entrada la información de los sensores y devuelve la acción a realizar.
 // Para ver los distintos sensores mirar fichero "comportamiento.hpp"
+
+
+
 Action ComportamientoJugador::think(Sensores sensores)
 {
 	Action accion = actIDLE;
@@ -31,10 +35,17 @@ Action ComportamientoJugador::think(Sensores sensores)
 		aux.columna = sensores.destino[2 * i + 1];
 		objetivos.push_back(aux);
 	}
-
-	bool hay_plan = pathFinding(sensores.nivel, actual, objetivos, plan);
-
-	return accion;
+	if(!hayPlan){
+		hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
+	}
+	Action sigAccion;
+	if(hayPlan and plan.size()>0){
+		sigAccion=plan.front();
+		plan.erase(plan.begin());
+	}else{
+		cout<<"no se ha encntrado un plan\n";
+	}
+	return sigAccion;
 }
 
 // Llama al algoritmo de busqueda que se usara en cada comportamiento del agente
@@ -53,8 +64,10 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 
 	case 1:
 		cout << "Optimo numero de acciones\n";
-		// Incluir aqui la llamada al busqueda en anchura
-		cout << "No implementado aun\n";
+		//estado un_objetivo;
+		un_objetivo = objetivos.front();
+		cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+		return pathFinding_Anchura(origen, un_objetivo, plan);
 		break;
 	case 2:
 		cout << "Optimo en coste\n";
@@ -76,7 +89,6 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 }
 
 //---------------------- Implementación de la busqueda en profundidad ---------------------------
-
 // Dado el codigo en caracter de una casilla del mapa dice si se puede
 // pasar por ella sin riegos de morir o chocar.
 bool EsObstaculo(unsigned char casilla)
@@ -151,14 +163,30 @@ struct nodo
 {
 	estado st;
 	list<Action> secuencia;
+	int costeUni;
+	bool operator<(const nodo &n) const{
+		return this->costeUni<n.costeUni;}
 };
-
+//Estructura para comparar el costo de los nodos
+struct compCosto{ 
+	bool operator()(const nodo &n1,const nodo &n2){ 
+		return n1 < n2;
+	} 
+};
 struct ComparaEstados
 {
 	bool operator()(const estado &a, const estado &n) const
 	{
-		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or
-			(a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion))
+		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion))
+			return true;
+		else
+			return false;
+	}
+};
+struct ComparaEstadosBateria{
+	bool operator()(const estado &a, const estado &n) const
+	{
+		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion) or (a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas) or (a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas and a.bikini > n.bikini))
 			return true;
 		else
 			return false;
@@ -377,3 +405,146 @@ int ComportamientoJugador::interact(Action accion, int valor)
 {
 	return false;
 }
+//Nivel 1: Busqueda en Anchura: Encontrar el camino con mínimo número de acciones a una casilla objetivo
+/********************************************************************************************
+El objetivo del agente es crear y llevar a cabo un plan de movimientos en el mapa para llegar
+desde su posición inicial al destino usando el menor número de acciones.
+********************************************************************************************/
+bool ComportamientoJugador::pathFinding_Anchura(const estado &origen, const estado &destino, list<Action> &plan)
+{
+	// Borro la lista
+	cout << "Calculando plan\n";
+	plan.clear();
+	set<estado, ComparaEstados> Cerrados; // Lista de Cerrados
+	queue<nodo> Abiertos;				  // Lista de Abiertos
+
+	nodo current;
+	current.st = origen;
+	current.secuencia.empty();
+
+	Abiertos.push(current);
+
+	while (!Abiertos.empty() and (current.st.fila != destino.fila or current.st.columna != destino.columna))
+	{
+
+		Abiertos.pop();
+		Cerrados.insert(current.st);
+
+		// Generar descendiente de girar a la derecha 90 grados
+		nodo hijoTurnR = current;
+		hijoTurnR.st.orientacion = (hijoTurnR.st.orientacion + 2) % 8;
+		if (Cerrados.find(hijoTurnR.st) == Cerrados.end())
+		{
+			hijoTurnR.secuencia.push_back(actTURN_R);
+			Abiertos.push(hijoTurnR);
+		}
+
+		// Generar descendiente de girar a la derecha 45 grados
+		nodo hijoSEMITurnR = current;
+		hijoSEMITurnR.st.orientacion = (hijoSEMITurnR.st.orientacion + 1) % 8;
+		if (Cerrados.find(hijoSEMITurnR.st) == Cerrados.end())
+		{
+			hijoSEMITurnR.secuencia.push_back(actSEMITURN_R);
+			Abiertos.push(hijoSEMITurnR);
+		}
+
+		// Generar descendiente de girar a la izquierda 90 grados
+		nodo hijoTurnL = current;
+		hijoTurnL.st.orientacion = (hijoTurnL.st.orientacion + 6) % 8;
+		if (Cerrados.find(hijoTurnL.st) == Cerrados.end())
+		{
+			hijoTurnL.secuencia.push_back(actTURN_L);
+			Abiertos.push(hijoTurnL);
+		}
+
+		// Generar descendiente de girar a la izquierda 45 grados
+		nodo hijoSEMITurnL = current;
+		hijoSEMITurnL.st.orientacion = (hijoSEMITurnL.st.orientacion + 7) % 8;
+		if (Cerrados.find(hijoSEMITurnL.st) == Cerrados.end())
+		{
+			hijoSEMITurnL.secuencia.push_back(actSEMITURN_L);
+			Abiertos.push(hijoSEMITurnL);
+		}
+
+		// Generar descendiente de avanzar
+		nodo hijoForward = current;
+		if (!HayObstaculoDelante(hijoForward.st))
+		{
+			if (Cerrados.find(hijoForward.st) == Cerrados.end())
+			{
+				hijoForward.secuencia.push_back(actFORWARD);
+				Abiertos.push(hijoForward);
+			}
+		}
+
+		// Tomo el siguiente valor de la Abiertos
+		if (!Abiertos.empty())
+		{
+			current = Abiertos.front();
+		}
+	}
+
+	cout << "Terminada la busqueda\n";
+
+	if (current.st.fila == destino.fila and current.st.columna == destino.columna)
+	{
+		cout << "Cargando el plan\n";
+		plan = current.secuencia;
+		cout << "Longitud del plan: " << plan.size() << endl;
+		PintaPlan(plan);
+		// ver el plan en el mapa
+		VisualizaPlan(origen, plan);
+		return true;
+	}
+	else
+	{
+		cout << "No encontrado plan\n";
+	}
+
+	return false;
+}
+
+
+
+//Nivel 2 Algoritmo Costo Uniforme: Encontrar el camino con el mínimo consumo de batería a una casilla objetivo
+/********************************************************************************************
+crear y llevar a cabo un plan de movimientos en el mapa para llegar desde su posición inicial 
+al destino teniendo el menor consumo de batería.
+********************************************************************************************/
+bool ComportamientoJugador::pathFinding_CostoUniforme(const estado &origen, const estado &destino, list<Action> &plan)
+{
+	// Borro la lista
+	cout << "Calculando plan\n";
+	plan.clear();
+	priority_queue<nodo,vector<nodo>,compCosto> Abiertos;				  // Lista de Abiertos
+
+	nodo current;
+	current.st = origen;
+	current.costeUni=0;
+	current.bikini=false;
+	current.zapatillas=false;
+	current.secuencia.empty();
+
+	
+	cout << "Terminada la busqueda\n";
+
+	if (current.st.fila == destino.fila and current.st.columna == destino.columna)
+	{
+		cout << "Cargando el plan\n";
+		plan = current.secuencia;
+		cout << "Longitud del plan: " << plan.size() << endl;
+		PintaPlan(plan);
+		// ver el plan en el mapa
+		VisualizaPlan(origen, plan);
+		return true;
+	}
+	else
+	{
+		cout << "No encontrado plan\n";
+	}
+
+	return false;
+}
+
+
+

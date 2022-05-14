@@ -9,6 +9,8 @@ struct estado {
   int fila;
   int columna;
   int orientacion;
+  bool zapatillas;
+  bool bikini;
 };
 
 class ComportamientoJugador : public Comportamiento {
@@ -32,13 +34,20 @@ class ComportamientoJugador : public Comportamiento {
     estado actual;
     list<estado> objetivos;
     list<Action> plan;
+    bool hayPlan;
 
     // Métodos privados de la clase
+    
+    //comportamientos
     bool pathFinding(int level, const estado &origen, const list<estado> &destino, list<Action> &plan);
     bool pathFinding_Profundidad(const estado &origen, const estado &destino, list<Action> &plan);
+    bool pathFinding_Anchura(const estado &origen, const estado &destino, list<Action> &plan);
+    bool pathFinding_CostoUniforme(const estado &origen, const estado &destino, list<Action> &plan);
 
+    //metodos auxiliares
     void PintaPlan(list<Action> plan);
     bool HayObstaculoDelante(estado &st);
+    
 
 };
 
