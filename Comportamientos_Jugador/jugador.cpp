@@ -71,8 +71,9 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 		break;
 	case 2:
 		cout << "Optimo en coste\n";
-		// Incluir aqui la llamada al busqueda de costo uniforme/A*
-		cout << "No implementado aun\n";
+		un_objetivo = objetivos.front();
+		cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+		return pathFinding_CostoUniforme(origen, un_objetivo, plan);
 		break;
 	case 3:
 		cout << "Reto 1: Descubrir el mapa\n";
@@ -159,25 +160,27 @@ bool ComportamientoJugador::HayObstaculoDelante(estado &st)
 	}
 }
 
-struct nodo
-{
+/*Mejor implementarlo en el hpp
+struct nodo{
 	estado st;
 	list<Action> secuencia;
 	int costeUni;
+	bool bikini;
+	bool zapatillas;
 	bool operator<(const nodo &n) const{
 		return this->costeUni<n.costeUni;}
-};
+};*/
 //Estructura para comparar el costo de los nodos
 struct compCosto{ 
 	bool operator()(const nodo &n1,const nodo &n2){ 
-		return n1 < n2;
+		return n2 < n1;
 	} 
 };
-struct ComparaEstados
-{
+struct ComparaEstados{
 	bool operator()(const estado &a, const estado &n) const
 	{
-		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion))
+		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or 
+			(a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion))
 			return true;
 		else
 			return false;
@@ -186,7 +189,10 @@ struct ComparaEstados
 struct ComparaEstadosBateria{
 	bool operator()(const estado &a, const estado &n) const
 	{
-		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion) or (a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas) or (a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas and a.bikini > n.bikini))
+		if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or 
+			(a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion) or 
+			(a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas) or 
+			(a.fila == n.fila and a.columna == n.columna and a.orientacion == n.orientacion and a.zapatillas > n.zapatillas and a.bikini > n.bikini))
 			return true;
 		else
 			return false;
@@ -476,10 +482,8 @@ bool ComportamientoJugador::pathFinding_Anchura(const estado &origen, const esta
 				Abiertos.push(hijoForward);
 			}
 		}
-
 		// Tomo el siguiente valor de la Abiertos
-		if (!Abiertos.empty())
-		{
+		if (!Abiertos.empty()){
 			current = Abiertos.front();
 		}
 	}
@@ -516,6 +520,7 @@ bool ComportamientoJugador::pathFinding_CostoUniforme(const estado &origen, cons
 	// Borro la lista
 	cout << "Calculando plan\n";
 	plan.clear();
+	set<estado,ComparaEstadosBateria> Cerrados;
 	priority_queue<nodo,vector<nodo>,compCosto> Abiertos;				  // Lista de Abiertos
 
 	nodo current;
@@ -525,7 +530,83 @@ bool ComportamientoJugador::pathFinding_CostoUniforme(const estado &origen, cons
 	current.zapatillas=false;
 	current.secuencia.empty();
 
-	
+	casillaEspecial(current.st);
+	int costo=costeCasilla(current, actIDLE);
+	Abiertos.push(current);
+	while (!Abiertos.empty() and (current.st.fila!=destino.fila or current.st.columna != destino.columna)){
+		//cout<<"Depurando1";
+		//eliminamos el nodo que vamos a expandir de los abuiertos
+		Abiertos.pop();
+		
+		
+		if(Cerrados.find(current.st) == Cerrados.end()){	
+			//Almacenamos en cerrados el nuevo nodo y comprobamos si es una casilla especial
+			Cerrados.insert(current.st);
+			casillaEspecial(current.st);
+
+			//Expandimos los nodos
+			nodo hijoTurnR = current;
+			hijoTurnR.st.orientacion = (hijoTurnR.st.orientacion+ 2) % 8; 
+			if(Cerrados.find(hijoTurnR.st) == Cerrados.end()){
+				costo=0;
+				costo=costeCasilla(hijoTurnR,actTURN_R);
+				//Actualizamos el costo del descendiente
+				hijoTurnR.costeUni = costo + current.costeUni;
+				hijoTurnR.secuencia.push_back(actTURN_R);
+				Abiertos.push(hijoTurnR); 
+			}
+			nodo hijoTurnL = current;
+			hijoTurnL.st.orientacion = (hijoTurnL.st.orientacion + 6) % 8;
+			if(Cerrados.find(hijoTurnL.st) == Cerrados.end()){
+				costo=0;
+				costo=costeCasilla(hijoTurnL,actTURN_L);
+				//Actualizamos el costo del descendiente
+				hijoTurnL.costeUni = costo + current.costeUni;
+				hijoTurnL.secuencia.push_back(actTURN_L);
+				Abiertos.push(hijoTurnL); 
+			}
+			nodo hijoSEMITurnR = current;
+			hijoSEMITurnR.st.orientacion = (hijoSEMITurnR.st.orientacion + 1) % 8; 
+			if(Cerrados.find(hijoSEMITurnR.st) == Cerrados.end()){
+				costo=0;
+				costo=costeCasilla(hijoSEMITurnR,actSEMITURN_R);
+				//Actualizamos el costo del descendiente
+				hijoSEMITurnR.costeUni = costo + current.costeUni;
+				hijoSEMITurnR.secuencia.push_back(actSEMITURN_R);
+				Abiertos.push(hijoSEMITurnR); 
+			}
+			nodo hijoSEMITurnL = current;
+			hijoSEMITurnL.st.orientacion = (hijoSEMITurnL.st.orientacion + 7) % 8;
+			if(Cerrados.find(hijoSEMITurnL.st) == Cerrados.end()){
+				costo=0;
+				costo=costeCasilla(hijoSEMITurnL,actSEMITURN_L);
+				//Actualizamos el costo del descendiente
+				hijoSEMITurnL.costeUni = costo + current.costeUni;
+				hijoSEMITurnL.secuencia.push_back(actSEMITURN_L);
+				Abiertos.push(hijoSEMITurnL); 
+			}
+			nodo hijoForward = current;
+			if(!HayObstaculoDelante(hijoForward.st)){
+				if(Cerrados.find(hijoForward.st) == Cerrados.end()){
+					costo=0;
+					costo=costeCasilla(hijoForward,actFORWARD);
+					//Actualizamos el costo del descendiente
+					hijoForward.costeUni = costo + current.costeUni;
+					hijoForward.secuencia.push_back(actFORWARD);
+					Abiertos.push(hijoForward); 
+				}
+			}
+		}
+		//PintaPlan(current.secuencia);
+		//cout<<current.costeUni<<endl;
+		//Tomamos el siguiente valor de abiertos
+		if(!Abiertos.empty()){
+			current = Abiertos.top();
+		}
+	}
+
+
+
 	cout << "Terminada la busqueda\n";
 
 	if (current.st.fila == destino.fila and current.st.columna == destino.columna)
@@ -545,6 +626,110 @@ bool ComportamientoJugador::pathFinding_CostoUniforme(const estado &origen, cons
 
 	return false;
 }
+//devuelve lo que cuesta cada casilla
+int ComportamientoJugador::costeCasilla(nodo &n,const Action &accion){
+	char flag = mapaResultado[n.st.fila][n.st.columna];
+	int coste = 0; 
+	if(accion == actIDLE){ 
+		return coste;
+	}else{
+		if(accion==actWHEREIS){
+			coste=200;
+		}else if(accion==actFORWARD){
+			if(flag=='A'){
+				coste=200;
+				if(n.bikini){
+					coste-=10;
+				}
+			}else if(flag=='B'){
+				coste=100;
+				if(n.zapatillas){
+					coste-=15;
+				}
+			}else if(flag=='T'){
+				coste=2;
+			}else{
+				coste=1;
+			}
+		}else if(accion==actTURN_L){
+			if(flag=='A'){
+				coste=500;
+				if(n.bikini){
+					coste-=5;
+				}
+			}else if(flag=='B'){
+				coste=3;
+				if(n.zapatillas){
+					coste-=1;
+				}
+			}else if(flag=='T'){
+				coste=2;
+			}else{
+				coste=1;
+			}
+		}else if(accion==actTURN_R){
+			if(flag=='A'){
+				coste=500;
+				if(n.bikini){
+					coste-=5;
+				}
+				
+			}else if(flag=='B'){
+				coste=3;
+				if(n.zapatillas){
+					coste-=1;
+				}
+			}else if(flag=='T'){
+				coste=2;
+			}else{
+				coste=1;
+			}
+		}else if(accion==actSEMITURN_L){
+			if(flag=='A'){
+				coste=300;
+				if(n.bikini){
+					coste-=2;
+				}
+			}else if(flag=='B'){
+				coste=3;
+				if(n.zapatillas){
+					coste-=1;
+				}
+			}else if(flag=='T'){
+				coste=2;
+			}else{
+				coste=1;
+			}
+		}else if(accion==actSEMITURN_R){
+			if(flag=='A'){
+				coste=300;
+				if(n.bikini){
+					coste-=2;
+				}
+				
+			}else if(flag=='B'){
+				coste=3;
+				if(n.zapatillas){
+					coste-=2;
+				}
+			}else if(flag=='T'){
+				coste=2;
+			}else{
+				coste=1;
+			}
+		}
+	}
+	return coste;
 
-
+}
+void ComportamientoJugador::casillaEspecial(estado &st){ 
+	char flag = mapaResultado[st.fila][st.columna];
+	if(flag == 'K' and !st.bikini){
+		st.bikini = true;
+		st.zapatillas = false;
+	}else if(flag == 'D' and !st.zapatillas){
+		st.zapatillas = true;
+		st.bikini = false; 
+	} 
+}
 

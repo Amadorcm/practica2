@@ -12,6 +12,15 @@ struct estado {
   bool zapatillas;
   bool bikini;
 };
+struct nodo{
+  estado st;
+  list<Action> secuencia;
+  int costeUni;
+  bool bikini;
+  bool zapatillas;
+  bool operator<(const nodo &n) const{
+    return this->costeUni<n.costeUni;}
+};
 
 class ComportamientoJugador : public Comportamiento {
   public:
@@ -47,7 +56,10 @@ class ComportamientoJugador : public Comportamiento {
     //metodos auxiliares
     void PintaPlan(list<Action> plan);
     bool HayObstaculoDelante(estado &st);
-    
+    //metodos auxiliares implementados por mi
+    void casillaEspecial(estado &st);
+    int costeCasilla(nodo &n,const Action &accion);
+
 
 };
 
